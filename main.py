@@ -1,7 +1,18 @@
-<<<<<<< HEAD
 from tokens import cmc_token
 import json
 import requests
+import re
+
+from flask import Flask
+from flask import request
+from flask import Response
+
+from flask_sslify import SSLify
+
+tg_token = '5683031385:AAE6DMBta9hWgo_WpmTVNXQXqe9xafEKjpI'
+
+app = Flask(__name__)
+sslify = SSLify(app)
 
 
 def write_json(data, filename='response.json'):
@@ -23,27 +34,64 @@ def get_cmc_data(crypto):
     print(price)
 
 
+def parse_message(message):
+    chat_id = message['message']['chat']['id']
+    txt = message['message']['text']
+
+    pattern = r"/[a-zA-Z]{2,4}"
+
+    ticker = re.findall(pattern, txt)
+
+    if ticker:
+        symbol = ticker[0][1:].upper()
+    else:
+        symbol = ''
+
+    return chat_id, symbol
+
+
+def send_message(chat_id, text='bla-bla'):
+    url = f'https://api.telegram.org/bot{token}/sendMessage'
+    payload = {'chat_id': chat_id, 'text': text}
+
+    r = requests.post(url, json=payload)
+    return r
+
+
+@app.route('/', methods=['POST', 'GET'])
+def index():
+    if request.method == 'POST':
+        msg = request.get_json()
+        chat_id, symbol = parse_message(msg)
+
+        if not symbol:
+            send_message(chat_id, text='Wrong data')
+            return Response('Ok', status=200)
+
+        price = get_cmc_data(symbol)
+        send_message(chat_id, price)
+        write_json(msg, 'telegram_request.json')
+        return Response('Ok', status=200)
+    else:
+        return '<h1>Coinmarketup Bot</h1>'
+
+
 def main():
+    # TODO BOT
+
+    # 1. Locally create a basic Flask application
+    # 2. Send up a tunnel
+    # 3. Set a webhook
+    # 4. Receive and parse a user's  message
+    # 5. Send message to a user
+
     get_cmc_data('BTC')
 
+    # https://api.telegram.org/bot5683031385:AAE6DMBta9hWgo_WpmTVNXQXqe9xafEKjpI/getMe
+    # https://api.telegram.org/bot5683031385:AAE6DMBta9hWgo_WpmTVNXQXqe9xafEKjpI/sendMessage?chat_id=392888619&text=Hello human
+
+
 
 if __name__ == '__main__':
-    main()
-=======
-# This is a sample Python script.
-
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
-
-
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
->>>>>>> 13fee2c (added some changes to send messages to bot)
+    # main()
+    app.run(debug=True, port=5005)
